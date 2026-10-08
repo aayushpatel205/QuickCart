@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-notification
+  namespace: quickcart
+  labels:
+    app: cart-notification
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cart-notification
+  template:
+    metadata:
+      labels:
+        app: cart-notification
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8085"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        # ── Main application container ──────────────────────────────────────
+        - name: cart-notification
+          image: quickcart/cart-notification:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+              name: http
+          envFrom:
+            - configMapRef:
+                name: cart-notification-config
+            - secretRef:
+                name: cart-notification-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8085
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8085
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: app-logs
+              mountPath: /app/logs
+
+        # ── Sidecar: log/metrics forwarder (Promtail) ────────────────────────
+        - name: promtail-sidecar
+          image: grafana/promtail:2.9.5
+          args:
+            - -config.file=/etc/promtail/config.yaml
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: app-logs
+              mountPath: /app/logs
+            - name: promtail-config
+              mountPath: /etc/promtail
+
+      volumes:
+        - name: app-logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: promtail-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-notification-service
+  namespace: quickcart
+  labels:
+    app: cart-notification
+spec:
+  selector:
+    app: cart-notification
+  ports:
+    - name: http
+      port: 8085
+      targetPort: 8085
+  type: ClusterIP

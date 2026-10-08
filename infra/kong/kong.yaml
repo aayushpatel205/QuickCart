@@ -1,0 +1,32 @@
+_format_version: "3.0"
+services:
+  - name: order-service
+    url: http://order-service:8081
+    routes:
+      - name: order-route
+        paths:
+          - /api/orders
+  - name: restaurant-service
+    url: http://restaurant-service:8082
+    routes:
+      - name: restaurant-route
+        paths:
+          - /api/restaurants
+  - name: payment-service
+    url: http://payment-service:8083
+    routes:
+      - name: payment-route
+        paths:
+          - /api/payments
+  - name: delivery-service
+    url: http://delivery-service:8084
+    routes:
+      - name: delivery-route
+        paths:
+          - /api/deliveries
+  - name: cart-notification
+    url: http://cart-notification:8085
+    routes:
+      - name: cart-route
+        paths:
+          - /api/cart

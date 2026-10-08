@@ -1,0 +1,239 @@
+# ── Default deny all ingress + egress ────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: quickcart
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# ── Allow Kong -> all services ───────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kong-to-services
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels: {}   # applies to all pods that accept traffic from Kong
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: kong
+      ports:
+        - port: 8081
+        - port: 8082
+        - port: 8083
+        - port: 8084
+        - port: 8085
+---
+# ── Allow services -> Kafka ───────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-to-kafka
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - order-service
+                  - payment-service
+                  - delivery-service
+                  - cart-notification
+                  - restaurant-service
+      ports:
+        - port: 9092
+---
+# ── Allow services -> RabbitMQ ────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-to-rabbitmq
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - order-service
+                  - delivery-service
+                  - cart-notification
+      ports:
+        - port: 5672
+---
+# ── cart-notification -> Redis ────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cart-to-redis
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: cart-notification
+      ports:
+        - port: 6379
+---
+# ── order-service -> orderdb PostgreSQL ───────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-order-to-postgres
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: orderdb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: order-service
+      ports:
+        - port: 5432
+---
+# ── payment-service -> paymentdb PostgreSQL ───────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-to-postgres
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: paymentdb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: payment-service
+      ports:
+        - port: 5432
+---
+# ── delivery-service -> deliverydb PostgreSQL ─────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-delivery-to-postgres
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: deliverydb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: delivery-service
+      ports:
+        - port: 5432
+---
+# ── restaurant-service -> MongoDB ─────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-restaurant-to-mongo
+  namespace: quickcart
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: restaurant-service
+      ports:
+        - port: 27017
+---
+# ── Allow DNS resolution (egress to kube-dns) for all pods ───────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: quickcart
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# ── Allow inter-service egress (services call each other) ────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-service-egress
+  namespace: quickcart
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - order-service
+          - payment-service
+          - delivery-service
+          - cart-notification
+          - restaurant-service
+          - kong
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8081
+        - port: 8082
+        - port: 8083
+        - port: 8084
+        - port: 8085
+        - port: 50051   # gRPC
+        - port: 9092    # Kafka
+        - port: 5672    # RabbitMQ
+        - port: 5432    # PostgreSQL
+        - port: 27017   # MongoDB
+        - port: 6379    # Redis
