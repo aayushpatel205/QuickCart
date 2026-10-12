@@ -1,0 +1,95 @@
+# docker-compose.yml – Full local stack for payment-service development
+# Brings up: PostgreSQL, Kafka (KRaft mode), and the payment-service itself
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  payment-postgres:
+    image: postgres:16-alpine
+    container_name: payment-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paymentdb
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_pass
+    ports:
+      - "5433:5432"       # host 5433 so it doesn't clash with any local Postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d paymentdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Kafka (KRaft mode – no Zookeeper, official apache/kafka image) ──────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 1
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 40s
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+
+  # ── Payment Service ─────────────────────────────────────────────────────────
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payment-service
+    restart: unless-stopped
+    depends_on:
+      payment-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      DB_HOST: payment-postgres
+      DB_PORT: "5432"
+      DB_NAME: paymentdb
+      DB_USER: payment_user
+      DB_PASSWORD: payment_pass
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_CONSUMER_GROUP: payment-service
+      KAFKA_TOPIC_ORDER_CREATED: order.created
+      KAFKA_TOPIC_PAYMENT_COMPLETED: payment.completed
+      KAFKA_TOPIC_PAYMENT_FAILED: payment.failed
+      PAYMENT_SUCCESS_THRESHOLD_AMOUNT: "5000"
+      PAYMENT_RANDOM_FAIL_PERCENT: "10"
+      CB_FAIL_MAX: "5"
+      CB_RESET_TIMEOUT: "60"
+      APP_ENV: development
+      LOG_LEVEL: INFO
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8083/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pgdata:
+  kafkadata:

@@ -1,0 +1,139 @@
+# k8s/deployment.yaml – payment-service Deployment
+# Includes 2 containers: the app + a Fluent Bit log/metrics sidecar
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: quickcart
+  labels:
+    app: payment-service
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/metrics"
+    spec:
+      # ── Security context (non-root) ─────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      # ── Init container: run Alembic migrations before app starts ─────────────
+      initContainers:
+        - name: db-migrate
+          image: quickcart/payment-service:latest
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: payment-service-config
+            - secretRef:
+                name: payment-service-secret
+
+      containers:
+        # ── Container 1: FastAPI application ───────────────────────────────────
+        - name: payment-service
+          image: quickcart/payment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+              name: http
+          envFrom:
+            - configMapRef:
+                name: payment-service-config
+            - secretRef:
+                name: payment-service-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          # Liveness probe – if this fails, Kubernetes restarts the container
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+
+          # Readiness probe – pod only receives traffic when this passes
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Shared log volume with sidecar
+          volumeMounts:
+            - name: log-volume
+              mountPath: /var/log/app
+
+        # ── Container 2: Fluent Bit sidecar (log + metrics forwarder) ──────────
+        - name: fluent-bit
+          image: fluent/fluent-bit:3.1
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: log-volume
+              mountPath: /var/log/app
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc/
+
+      volumes:
+        - name: log-volume
+          emptyDir: {}
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+---
+# Fluent Bit sidecar ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: quickcart
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     info
+        Daemon        off
+
+    [INPUT]
+        Name          tail
+        Path          /var/log/app/*.log
+        Tag           payment-service
+        Parser        json
+        Refresh_Interval 5
+
+    [OUTPUT]
+        Name          stdout
+        Match         *
+        Format        json

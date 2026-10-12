@@ -1,0 +1,113 @@
+# prometheus.yml – Prometheus scrape configuration for the whole QuickCart platform
+# Deploy this as a ConfigMap (see monitoring/prometheus-deployment.yaml)
+
+global:
+  scrape_interval: 15s          # how often to scrape targets
+  evaluation_interval: 15s      # how often to evaluate rules
+  scrape_timeout: 10s
+
+# ── Alerting ──────────────────────────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# ── Rule files ────────────────────────────────────────────────────────────────
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# ── Scrape jobs ───────────────────────────────────────────────────────────────
+scrape_configs:
+
+  # ── Prometheus self-monitoring ────────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── Order Service (Java/Spring Boot – Actuator) ───────────────────────────
+  - job_name: "order-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["order-service.quickcart.svc.cluster.local:8081"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "order-service"
+
+  # ── Restaurant Service (Node.js / prom-client) ────────────────────────────
+  - job_name: "restaurant-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["restaurant-service.quickcart.svc.cluster.local:8082"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "restaurant-service"
+
+  # ── Payment Service (Python / FastAPI / prometheus-client) ────────────────
+  - job_name: "payment-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["payment-service.quickcart.svc.cluster.local:8083"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "payment-service"
+
+  # ── Delivery Service (Go / Gin / promhttp) ────────────────────────────────
+  - job_name: "delivery-service"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["delivery-service.quickcart.svc.cluster.local:8084"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "delivery-service"
+
+  # ── Cart / Notification Service (C# .NET 8) ──────────────────────────────
+  - job_name: "cart-notification"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["cart-notification.quickcart.svc.cluster.local:8085"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "cart-notification"
+
+  # ── Kong API Gateway ──────────────────────────────────────────────────────
+  # Kong exposes Prometheus metrics via the Prometheus plugin on port 8001
+  - job_name: "kong"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["kong.quickcart.svc.cluster.local:8001"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "kong-gateway"
+
+  # ── Kafka Exporter (optional – deploy kafka-exporter sidecar/deployment) ──
+  - job_name: "kafka-exporter"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["kafka-exporter.quickcart.svc.cluster.local:9308"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "kafka"
+
+  # ── PostgreSQL Exporter (one per DB instance) ─────────────────────────────
+  - job_name: "postgres-payment"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["postgres-exporter-payment.quickcart.svc.cluster.local:9187"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "postgres-payment"
+
+  # ── Kubernetes node-level metrics via kube-state-metrics ─────────────────
+  - job_name: "kube-state-metrics"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["kube-state-metrics.kube-system.svc.cluster.local:8080"]

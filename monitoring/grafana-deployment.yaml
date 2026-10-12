@@ -1,0 +1,187 @@
+# monitoring/grafana-deployment.yaml
+# Deploys Grafana with pre-provisioned Prometheus datasource and QuickCart dashboard
+
+---
+# ConfigMap: Prometheus datasource provisioning
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-config
+  namespace: quickcart
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus-ds
+        url: http://prometheus:9090
+        access: proxy
+        isDefault: true
+        jsonData:
+          timeInterval: "15s"
+          httpMethod: GET
+        editable: false
+
+---
+# ConfigMap: Dashboard provider config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: quickcart
+data:
+  provider.yml: |
+    apiVersion: 1
+    providers:
+      - name: "QuickCart Dashboards"
+        type: file
+        disableDeletion: true
+        updateIntervalSeconds: 30
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards
+
+---
+# ConfigMap: Grafana admin credentials (use Secret in production!)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-env-config
+  namespace: quickcart
+data:
+  GF_SECURITY_ADMIN_USER: "admin"
+  GF_SECURITY_ADMIN_PASSWORD: "quickcart123"
+  GF_USERS_ALLOW_SIGN_UP: "false"
+  GF_SERVER_HTTP_PORT: "3000"
+  GF_PATHS_PROVISIONING: "/etc/grafana/provisioning"
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: quickcart
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472      # grafana default UID
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.2.0
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: grafana-env-config
+          volumeMounts:
+            - name: datasource-config
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-json
+              mountPath: /var/lib/grafana/dashboards
+            - name: grafana-data
+              mountPath: /var/lib/grafana
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: datasource-config
+          configMap:
+            name: grafana-datasource-config
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboard-json
+          configMap:
+            name: grafana-dashboard-json
+        - name: grafana-data
+          emptyDir: {}      # use PersistentVolumeClaim in production
+
+---
+# The dashboard JSON is mounted as a ConfigMap
+# In practice, store the full dashboard JSON here or reference a file
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-json
+  namespace: quickcart
+data:
+  quickcart-overview.json: |
+    {
+      "uid": "quickcart-overview",
+      "title": "QuickCart Platform Overview",
+      "tags": ["quickcart"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "panels": []
+    }
+  # NOTE: Replace the panels array above with the full content of
+  # monitoring/grafana/dashboards/quickcart-overview.json
+
+---
+# Service: expose Grafana inside the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: quickcart
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP
+
+---
+# Optional: NodePort for local development access
+# Uncomment to expose Grafana on host port 30300
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: grafana-nodeport
+#   namespace: quickcart
+# spec:
+#   selector:
+#     app: grafana
+#   ports:
+#     - port: 3000
+#       targetPort: 3000
+#       nodePort: 30300
+#   type: NodePort

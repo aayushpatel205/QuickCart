@@ -1,0 +1,14 @@
+# Grafana provisioning – datasource (Prometheus)
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus-ds
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: true
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: GET
+    editable: false

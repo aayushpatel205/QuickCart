@@ -1,0 +1,73 @@
+# alert_rules.yml – Prometheus alerting rules for QuickCart
+groups:
+  - name: quickcart.service_health
+    interval: 30s
+    rules:
+
+      # ── Service Down ─────────────────────────────────────────────────────────
+      - alert: ServiceDown
+        expr: up{job=~"order-service|restaurant-service|payment-service|delivery-service|cart-notification"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: quickcart
+        annotations:
+          summary: "QuickCart service {{ $labels.job }} is DOWN"
+          description: >
+            Service {{ $labels.job }} on instance {{ $labels.instance }}
+            has been unreachable for more than 1 minute.
+
+      # ── High Error Rate ───────────────────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status_code=~"5.."}[5m])
+          / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          team: quickcart
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: >
+            Error rate on {{ $labels.service }} exceeds 5% over the last 5 minutes
+            (current: {{ $value | humanizePercentage }}).
+
+      # ── Payment Failure Spike ─────────────────────────────────────────────────
+      - alert: PaymentFailureSpike
+        expr: |
+          rate(payments_total{status="FAILED"}[5m])
+          / (rate(payments_total[5m]) + 0.001) > 0.20
+        for: 2m
+        labels:
+          severity: critical
+          team: quickcart
+        annotations:
+          summary: "Payment failure rate above 20%"
+          description: >
+            More than 20% of payment attempts are failing over the last 5 minutes
+            (current: {{ $value | humanizePercentage }}).
+
+      # ── High Latency ──────────────────────────────────────────────────────────
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: quickcart
+        annotations:
+          summary: "P95 latency above 2s on {{ $labels.service }}"
+          description: >
+            95th-percentile HTTP latency for {{ $labels.service }} is
+            {{ $value | humanizeDuration }}, above the 2-second SLA threshold.
+
+      # ── Circuit Breaker Open ──────────────────────────────────────────────────
+      - alert: KongGatewayDown
+        expr: up{job="kong"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: quickcart
+        annotations:
+          summary: "Kong API Gateway is DOWN"
+          description: "Kong (job={{ $labels.job }}) has been unreachable for 1 minute."

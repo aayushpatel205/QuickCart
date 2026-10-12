@@ -1,0 +1,12 @@
+# Grafana provisioning – dashboard provider
+apiVersion: 1
+
+providers:
+  - name: "QuickCart Dashboards"
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

@@ -1,0 +1,248 @@
+{
+  "id": null,
+  "uid": "quickcart-overview",
+  "title": "QuickCart Platform Overview",
+  "tags": ["quickcart", "microservices"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": { "type": "prometheus", "uid": "prometheus-ds" },
+        "query": "label_values(up, job)",
+        "multi": true,
+        "includeAll": true,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "🟢 Services Up / Down",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "up{job=~\"order-service|restaurant-service|payment-service|delivery-service|cart-notification\"}",
+          "legendFormat": "{{job}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": 0 },
+            { "color": "green", "value": 1 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "📈 Requests Per Second (per service)",
+      "type": "timeseries",
+      "gridPos": { "x": 6, "y": 0, "w": 18, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(http_requests_total[2m]))",
+          "legendFormat": "{{service}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "❌ Error Rate (5xx) per Service",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(http_requests_total{status_code=~\"5..\"}[5m])) / sum by (service) (rate(http_requests_total[5m]))",
+          "legendFormat": "{{service}} error rate",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "⏱ HTTP Latency P95 (per service)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{service}} p95",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "💳 Payments: Completed vs Failed",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(payments_total{status=\"COMPLETED\"}[5m])",
+          "legendFormat": "Completed",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        },
+        {
+          "expr": "rate(payments_total{status=\"FAILED\"}[5m])",
+          "legendFormat": "Failed",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        },
+        {
+          "expr": "rate(payments_total{status=\"REFUNDED\"}[5m])",
+          "legendFormat": "Refunded",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Completed" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Refunded" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "title": "⏱ Payment Processing Latency (P50 / P95 / P99)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(payment_latency_seconds_bucket[5m]))",
+          "legendFormat": "p50",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(payment_latency_seconds_bucket[5m]))",
+          "legendFormat": "p95",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(payment_latency_seconds_bucket[5m]))",
+          "legendFormat": "p99",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 7,
+      "title": "📦 Total Payments (all time)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 24, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(payments_total)",
+          "legendFormat": "Total",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 8,
+      "title": "✅ Payments Completed (all time)",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 24, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(payments_total{status=\"COMPLETED\"})",
+          "legendFormat": "Completed",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "options": {
+        "colorMode": "background", "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": 0 }] }
+      }
+    },
+    {
+      "id": 9,
+      "title": "❌ Payments Failed (all time)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 24, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(payments_total{status=\"FAILED\"})",
+          "legendFormat": "Failed",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "options": {
+        "colorMode": "background", "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": 0 }, { "color": "red", "value": 1 }] }
+      }
+    },
+    {
+      "id": 10,
+      "title": "🔄 Kafka Consumer Lag (if kafka-exporter enabled)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "kafka_consumergroup_lag{consumergroup=\"payment-service\"}",
+          "legendFormat": "{{topic}} partition {{partition}}",
+          "datasource": { "type": "prometheus", "uid": "prometheus-ds" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [{ "color": "green", "value": 0 }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 1000 }]
+        }
+      }
+    }
+  ]
+}
