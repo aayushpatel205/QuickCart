@@ -31,11 +31,13 @@ class Settings(BaseSettings):
             )
         # Normalize driver prefix for asyncpg
         if raw.startswith("postgres://"):
-            return "postgresql+asyncpg://" + raw[len("postgres://"):]
-        if raw.startswith("postgresql://"):
-            return "postgresql+asyncpg://" + raw[len("postgresql://"):]
-        if raw.startswith("postgresql+psycopg2://"):
-            return "postgresql+asyncpg://" + raw[len("postgresql+psycopg2://"):]
+            raw = "postgresql+asyncpg://" + raw[len("postgres://"):]
+        elif raw.startswith("postgresql://"):
+            raw = "postgresql+asyncpg://" + raw[len("postgresql://"):]
+        elif raw.startswith("postgresql+psycopg2://"):
+            raw = "postgresql+asyncpg://" + raw[len("postgresql+psycopg2://"):]
+        if "localhost" in raw or "127.0.0.1" in raw:
+            raw = raw.replace("localhost", "paymentdb").replace("127.0.0.1", "paymentdb")
         return raw
 
     @property
@@ -52,11 +54,13 @@ class Settings(BaseSettings):
             )
         # Normalize driver prefix for psycopg2
         if raw.startswith("postgres://"):
-            return "postgresql+psycopg2://" + raw[len("postgres://"):]
-        if raw.startswith("postgresql://"):
-            return "postgresql+psycopg2://" + raw[len("postgresql://"):]
-        if raw.startswith("postgresql+asyncpg://"):
-            return "postgresql+psycopg2://" + raw[len("postgresql+asyncpg://"):]
+            raw = "postgresql+psycopg2://" + raw[len("postgres://"):]
+        elif raw.startswith("postgresql://"):
+            raw = "postgresql+psycopg2://" + raw[len("postgresql://"):]
+        elif raw.startswith("postgresql+asyncpg://"):
+            raw = "postgresql+psycopg2://" + raw[len("postgresql+asyncpg://"):]
+        if "localhost" in raw or "127.0.0.1" in raw:
+            raw = raw.replace("localhost", "paymentdb").replace("127.0.0.1", "paymentdb")
         return raw
 
     # ── Kafka ─────────────────────────────────────────────────────────────────

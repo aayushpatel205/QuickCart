@@ -13,6 +13,8 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+if "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("localhost", "paymentdb").replace("127.0.0.1", "paymentdb")
 
 engine = create_async_engine(
     DATABASE_URL,

@@ -22,6 +22,8 @@ elif sync_db_url.startswith("postgresql://"):
     sync_db_url = sync_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 elif sync_db_url.startswith("postgresql+asyncpg://"):
     sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+if "localhost" in sync_db_url or "127.0.0.1" in sync_db_url:
+    sync_db_url = sync_db_url.replace("localhost", "paymentdb").replace("127.0.0.1", "paymentdb")
 
 config = context.config
 config.set_main_option("sqlalchemy.url", sync_db_url)
