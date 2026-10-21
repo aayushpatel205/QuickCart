@@ -2,13 +2,20 @@
 database.py – Async SQLAlchemy engine + session factory.
 Uses asyncpg driver for non-blocking I/O inside FastAPI event loop.
 """
+import os
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import settings
 
+DATABASE_URL = os.getenv("DATABASE_URL", getattr(settings, "DATABASE_URL", "postgresql+asyncpg://paymentuser:paymentpass@paymentdb:5432/paymentdb"))
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

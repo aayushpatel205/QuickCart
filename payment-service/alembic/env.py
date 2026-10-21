@@ -15,8 +15,16 @@ from app.config import settings
 from app.database import Base
 from app.models import Payment, ProcessedEvent  # noqa: F401  register models
 
+sync_db_url = os.getenv("DATABASE_URL", settings.SYNC_DATABASE_URL)
+if sync_db_url.startswith("postgres://"):
+    sync_db_url = sync_db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif sync_db_url.startswith("postgresql://"):
+    sync_db_url = sync_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+elif sync_db_url.startswith("postgresql+asyncpg://"):
+    sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.SYNC_DATABASE_URL)
+config.set_main_option("sqlalchemy.url", sync_db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

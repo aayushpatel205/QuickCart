@@ -13,6 +13,7 @@ Shutdown sequence:
   3. Dispose SQLAlchemy engine
 """
 import asyncio
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -27,6 +28,13 @@ from app.logging_config import get_logger, setup_logging
 from app.metrics import http_request_duration_seconds, http_requests_total
 from app.routers.payments import router as payments_router
 
+# Read database URL from environment variable, defaulting to paymentdb
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://paymentuser:paymentpass@paymentdb:5432/paymentdb")
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
 setup_logging()
 log = get_logger(__name__)
 
@@ -34,13 +42,14 @@ log = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage startup and graceful shutdown."""
-    log.info("Payment service starting up", extra={"env": settings.APP_ENV})
+    safe_db_url = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL
+    log.info("Payment service starting up", extra={"env": settings.APP_ENV, "db_target": safe_db_url})
 
     # Create tables with retries to handle container startup timing
     max_retries = 10
     for attempt in range(1, max_retries + 1):
         try:
-            log.info("Connecting to database...", extra={"attempt": attempt, "max_retries": max_retries})
+            log.info(f"Connecting to database at {safe_db_url}...", extra={"attempt": attempt, "max_retries": max_retries})
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             log.info("Database tables ready")
