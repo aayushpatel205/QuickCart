@@ -30,16 +30,36 @@ _consumer_task: asyncio.Task | None = None
 
 
 async def _consume_loop() -> None:
-    consumer = AIOKafkaConsumer(
-        settings.KAFKA_TOPIC_ORDER_CREATED,
-        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-        group_id=settings.KAFKA_CONSUMER_GROUP,
-        auto_offset_reset="earliest",
-        enable_auto_commit=False,   # manual commit after successful processing
-        value_deserializer=lambda b: json.loads(b.decode("utf-8")),
-    )
-    await consumer.start()
-    log.info("Kafka consumer started", extra={"topic": settings.KAFKA_TOPIC_ORDER_CREATED})
+    consumer = None
+    max_retries = 15
+    for attempt in range(1, max_retries + 1):
+        try:
+            consumer = AIOKafkaConsumer(
+                settings.KAFKA_TOPIC_ORDER_CREATED,
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+                group_id=settings.KAFKA_CONSUMER_GROUP,
+                auto_offset_reset="earliest",
+                enable_auto_commit=False,   # manual commit after successful processing
+                value_deserializer=lambda b: json.loads(b.decode("utf-8")),
+            )
+            await consumer.start()
+            log.info("Kafka consumer started", extra={"topic": settings.KAFKA_TOPIC_ORDER_CREATED})
+            break
+        except asyncio.CancelledError:
+            log.info("Kafka consumer task cancelled during startup")
+            return
+        except Exception as exc:
+            if attempt == max_retries:
+                log.error("Kafka consumer failed to start after maximum retries", extra={"error": str(exc)})
+                return
+            log.warning(
+                "Kafka broker not ready yet, retrying in 3 seconds...",
+                extra={"attempt": attempt, "error": str(exc)},
+            )
+            await asyncio.sleep(3)
+
+    if not consumer:
+        return
 
     try:
         async for msg in consumer:

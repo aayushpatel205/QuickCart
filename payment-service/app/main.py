@@ -12,6 +12,7 @@ Shutdown sequence:
   2. Stop Kafka producer
   3. Dispose SQLAlchemy engine
 """
+import asyncio
 import time
 from contextlib import asynccontextmanager
 
@@ -35,10 +36,24 @@ async def lifespan(app: FastAPI):
     """Manage startup and graceful shutdown."""
     log.info("Payment service starting up", extra={"env": settings.APP_ENV})
 
-    # Create tables (simple approach; use Alembic for production migrations)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    log.info("Database tables ready")
+    # Create tables with retries to handle container startup timing
+    max_retries = 10
+    for attempt in range(1, max_retries + 1):
+        try:
+            log.info("Connecting to database...", extra={"attempt": attempt, "max_retries": max_retries})
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            log.info("Database tables ready")
+            break
+        except Exception as exc:
+            if attempt == max_retries:
+                log.error("Failed to connect to database after maximum retries", extra={"error": str(exc)})
+                raise
+            log.warning(
+                "Database not ready yet, retrying in 2 seconds...",
+                extra={"attempt": attempt, "error": str(exc)},
+            )
+            await asyncio.sleep(2)
 
     # Start Kafka consumer background task
     start_consumer()

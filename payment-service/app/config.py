@@ -2,30 +2,62 @@
 config.py – All configuration comes from environment variables.
 Kubernetes ConfigMap provides non-secret values; Secrets provide DB_PASSWORD etc.
 """
+from typing import Optional
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────────────
-    DB_HOST: str = "localhost"
+    # Supports reading DATABASE_URL directly from environment (e.g., Docker Compose / K8s)
+    raw_database_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
+
+    DB_HOST: str = "paymentdb"
     DB_PORT: int = 5432
     DB_NAME: str = "paymentdb"
-    DB_USER: str = "payment_user"
-    DB_PASSWORD: str = "payment_pass"
+    DB_USER: str = "paymentuser"
+    DB_PASSWORD: str = "paymentpass"
 
     @property
-    def DATABASE_URL(self) -> str:  # async driver
-        return (
-            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+    def DATABASE_URL(self) -> str:  # async driver for SQLAlchemy AsyncEngine
+        raw = self.raw_database_url
+        if not raw or not raw.strip():
+            return (
+                f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
+                f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            )
+        # Normalize driver prefix for asyncpg
+        if raw.startswith("postgres://"):
+            return "postgresql+asyncpg://" + raw[len("postgres://"):]
+        if raw.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + raw[len("postgresql://"):]
+        if raw.startswith("postgresql+psycopg2://"):
+            return "postgresql+asyncpg://" + raw[len("postgresql+psycopg2://"):]
+        return raw
 
     @property
-    def SYNC_DATABASE_URL(self) -> str:  # for Alembic
-        return (
-            f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+    def ASYNC_DATABASE_URL(self) -> str:  # alias for async driver
+        return self.DATABASE_URL
+
+    @property
+    def SYNC_DATABASE_URL(self) -> str:  # sync driver for Alembic
+        raw = self.raw_database_url
+        if not raw or not raw.strip():
+            return (
+                f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}"
+                f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            )
+        # Normalize driver prefix for psycopg2
+        if raw.startswith("postgres://"):
+            return "postgresql+psycopg2://" + raw[len("postgres://"):]
+        if raw.startswith("postgresql://"):
+            return "postgresql+psycopg2://" + raw[len("postgresql://"):]
+        if raw.startswith("postgresql+asyncpg://"):
+            return "postgresql+psycopg2://" + raw[len("postgresql+asyncpg://"):]
+        return raw
 
     # ── Kafka ─────────────────────────────────────────────────────────────────
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
