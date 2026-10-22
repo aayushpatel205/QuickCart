@@ -15,7 +15,7 @@ curl -X POST "$BASE_URL/$USER_ID/items" \
      }'
 echo ""
 echo "----------------------------------------"
-
+    
 echo "2. Viewing cart..."
 curl -X GET "$BASE_URL/$USER_ID"
 echo ""

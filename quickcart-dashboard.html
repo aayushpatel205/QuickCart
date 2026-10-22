@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QuickCart — Service Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font: 'Inter', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .logo h1 { font-size: 22px; font-weight: 700; }
+  .logo span { color: var(--muted); font-size: 13px; margin-top: 2px; display: block; }
+  .header-right { display: flex; align-items: center; gap: 20px; }
+  #last-updated { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .refresh-btn {
+    background: var(--accent); color: white; border: none; border-radius: 8px;
+    padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: all 0.2s;
+  }
+  .refresh-btn:hover { background: #2563eb; transform: translateY(-1px); }
+  .refresh-btn.spinning .icon { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Layout ── */
+  main { max-width: 1300px; margin: 0 auto; padding: 36px 24px; }
+  .section-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  /* ── Status Summary Bar ── */
+  .summary-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 24px; display: flex; align-items: center; gap: 16px;
+  }
+  .stat-icon { font-size: 28px; }
+  .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.yellow { color: var(--yellow); }
+
+  /* ── Services Grid ── */
+  .services-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;
+    margin-bottom: 36px;
+  }
+  .service-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; position: relative; overflow: hidden; transition: all 0.25s;
+  }
+  .service-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(59,130,246,0.08); }
+  .service-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .service-card:hover::before { opacity: 1; }
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .card-info { display: flex; align-items: center; gap: 12px; }
+  .service-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; background: var(--surface2);
+  }
+  .service-name { font-size: 15px; font-weight: 600; }
+  .service-tech { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .status-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    background: rgba(100,116,139,0.15); color: var(--muted);
+    transition: all 0.3s;
+  }
+  .status-badge.online { background: rgba(16,185,129,0.15); color: var(--green); }
+  .status-badge.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+  .status-badge.checking { background: rgba(245,158,11,0.15); color: var(--yellow); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot.pulse { animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Meta / health detail */
+  .card-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .meta-tag {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 9px; font-size: 11px; color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  /* Response box */
+  .response-box {
+    background: #050b14; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; font-family: var(--mono); font-size: 11px; color: #94a3b8;
+    max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    transition: all 0.3s; display: none; margin-top: 10px;
+  }
+  .response-box.visible { display: block; }
+  .response-box.success { border-color: rgba(16,185,129,0.3); color: #6ee7b7; }
+  .response-box.error { border-color: rgba(239,68,68,0.3); color: #fca5a5; }
+
+  /* Test buttons */
+  .test-btns { display: flex; gap: 8px; margin-top: 14px; }
+  .test-btn {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 500;
+    color: var(--text); cursor: pointer; transition: all 0.2s; font-family: var(--font);
+  }
+  .test-btn:hover { background: rgba(59,130,246,0.12); border-color: var(--accent); color: var(--accent); }
+  .test-btn.primary { background: rgba(59,130,246,0.12); border-color: var(--accent); color: var(--accent); }
+
+  /* ── Infrastructure ── */
+  .infra-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+    margin-bottom: 36px;
+  }
+  .infra-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; display: flex; align-items: center; gap: 12px; transition: all 0.25s;
+  }
+  .infra-card:hover { border-color: var(--border); background: var(--surface2); }
+  .infra-avatar { font-size: 24px; flex-shrink: 0; }
+  .infra-name { font-size: 13px; font-weight: 500; }
+  .infra-port { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .infra-status { margin-left: auto; font-size: 16px; }
+
+  /* ── Architecture Flow ── */
+  .arch-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 24px; margin-bottom: 36px;
+  }
+  .flow {
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 8px; margin-top: 16px;
+  }
+  .flow-node {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: 500;
+    text-align: center; min-width: 100px;
+  }
+  .flow-node .fn-icon { font-size: 18px; margin-bottom: 4px; }
+  .flow-node.accent { border-color: var(--accent); background: rgba(59,130,246,0.08); color: var(--accent); }
+  .flow-arrow { color: var(--muted); font-size: 16px; }
+
+  /* ── Log Feed ── */
+  .log-box {
+    background: #050b14; border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; height: 220px; overflow-y: auto; font-family: var(--mono);
+    font-size: 12px; margin-bottom: 36px;
+  }
+  .log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .log-entry .ts { color: var(--muted); margin-right: 8px; }
+  .log-entry.success .msg { color: var(--green); }
+  .log-entry.error .msg { color: var(--red); }
+  .log-entry.info .msg { color: #60a5fa; }
+  .log-entry.warn .msg { color: var(--yellow); }
+
+  /* ── Footer ── */
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; border-top: 1px solid var(--border); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Responsive ── */
+  @media(max-width:768px) {
+    header { padding: 16px 20px; }
+    main { padding: 20px 16px; }
+    .summary-bar { grid-template-columns: repeat(2,1fr); }
+    .services-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛒</div>
+    <div>
+      <h1>QuickCart</h1>
+      <span>Microservices Dashboard</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="last-updated">Never refreshed</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="checkAll()">
+      <span class="icon">↻</span> Refresh All
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Summary -->
+  <div class="summary-bar">
+    <div class="stat-card">
+      <div class="stat-icon">🟢</div>
+      <div>
+        <div class="stat-label">Services Online</div>
+        <div class="stat-value green" id="count-online">—</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🔴</div>
+      <div>
+        <div class="stat-label">Services Offline</div>
+        <div class="stat-value red" id="count-offline">—</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🌐</div>
+      <div>
+        <div class="stat-label">Total Services</div>
+        <div class="stat-value" style="color:var(--accent)">5</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⚡</div>
+      <div>
+        <div class="stat-label">Auto-Refresh</div>
+        <div class="stat-value yellow" id="countdown">30s</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <div class="section-title">Request Flow</div>
+  <div class="arch-box">
+    <div class="flow">
+      <div class="flow-node accent">
+        <div class="fn-icon">👤</div>Client
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node accent">
+        <div class="fn-icon">🔀</div>Kong Gateway<br><small>:8080</small>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="fn-icon">🍕</div>Restaurant<br><small>:8082</small>
+      </div>
+      <div class="flow-arrow">/</div>
+      <div class="flow-node">
+        <div class="fn-icon">📦</div>Order<br><small>:8081</small>
+      </div>
+      <div class="flow-arrow">/</div>
+      <div class="flow-node">
+        <div class="fn-icon">💳</div>Payment<br><small>:8083</small>
+      </div>
+      <div class="flow-arrow">/</div>
+      <div class="flow-node">
+        <div class="fn-icon">🚚</div>Delivery<br><small>:8084</small>
+      </div>
+      <div class="flow-arrow">/</div>
+      <div class="flow-node">
+        <div class="fn-icon">🔔</div>Cart-Notif<br><small>:8085</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Microservices -->
+  <div class="section-title">Microservices</div>
+  <div class="services-grid" id="services-grid"></div>
+
+  <!-- Infrastructure -->
+  <div class="section-title">Infrastructure</div>
+  <div class="infra-grid" id="infra-grid"></div>
+
+  <!-- Activity Log -->
+  <div class="section-title">Activity Log</div>
+  <div class="log-box" id="log-box"></div>
+
+</main>
+
+<footer>QuickCart · MAP Assignment · Built with microservices architecture ·
+  <a href="http://localhost:15672" target="_blank" style="color:var(--accent)">RabbitMQ</a> ·
+  <a href="http://localhost:3000" target="_blank" style="color:var(--accent)">Grafana</a> ·
+  <a href="http://localhost:9090" target="_blank" style="color:var(--accent)">Prometheus</a>
+</footer>
+
+<script>
+const SERVICES = [
+  {
+    id: 'restaurant',
+    name: 'Restaurant Service',
+    tech: 'Node.js · MongoDB · gRPC',
+    icon: '🍕',
+    port: 8082,
+    healthUrl: 'http://localhost:8082/health',
+    endpoints: [
+      { label: 'Health', url: 'http://localhost:8082/health', method: 'GET' },
+      { label: 'Restaurants', url: 'http://localhost:8082/restaurants', method: 'GET' },
+    ]
+  },
+  {
+    id: 'order',
+    name: 'Order Service',
+    tech: 'Java · Spring Boot · PostgreSQL',
+    icon: '📦',
+    port: 8081,
+    healthUrl: 'http://localhost:8081/actuator/health',
+    endpoints: [
+      { label: 'Health', url: 'http://localhost:8081/actuator/health', method: 'GET' },
+      { label: 'Orders', url: 'http://localhost:8081/api/orders', method: 'GET' },
+    ]
+  },
+  {
+    id: 'payment',
+    name: 'Payment Service',
+    tech: 'Python · FastAPI · PostgreSQL',
+    icon: '💳',
+    port: 8083,
+    healthUrl: 'http://localhost:8083/health',
+    endpoints: [
+      { label: 'Health', url: 'http://localhost:8083/health', method: 'GET' },
+      { label: 'Docs', url: 'http://localhost:8083/docs', method: 'GET', newTab: true },
+    ]
+  },
+  {
+    id: 'delivery',
+    name: 'Delivery Service',
+    tech: 'Go · PostgreSQL · Kafka',
+    icon: '🚚',
+    port: 8084,
+    healthUrl: 'http://localhost:8084/health',
+    endpoints: [
+      { label: 'Health', url: 'http://localhost:8084/health', method: 'GET' },
+      { label: 'Deliveries', url: 'http://localhost:8084/api/deliveries', method: 'GET' },
+    ]
+  },
+  {
+    id: 'cart',
+    name: 'Cart Notification',
+    tech: 'C# · .NET 8 · RabbitMQ · Redis',
+    icon: '🔔',
+    port: 8085,
+    healthUrl: 'http://localhost:8085/health',
+    endpoints: [
+      { label: 'Health', url: 'http://localhost:8085/health', method: 'GET' },
+      { label: 'Metrics', url: 'http://localhost:8085/metrics', method: 'GET' },
+    ]
+  }
+];
+
+const INFRA = [
+  { name: 'Kong Gateway', icon: '🔀', port: '8080', url: null, ping: 'http://localhost:8001/' },
+  { name: 'RabbitMQ', icon: '🐇', port: '15672', url: 'http://localhost:15672', ping: null },
+  { name: 'Kafka', icon: '⚡', port: '9092', url: null, ping: null },
+  { name: 'PostgreSQL (Order)', icon: '🗄️', port: '5433', url: null, ping: null },
+  { name: 'PostgreSQL (Payment)', icon: '🗄️', port: '5434', url: null, ping: null },
+  { name: 'MongoDB', icon: '🍃', port: '27017', url: null, ping: null },
+  { name: 'Redis', icon: '🔴', port: '6379', url: null, ping: null },
+  { name: 'Prometheus', icon: '📈', port: '9090', url: 'http://localhost:9090', ping: 'http://localhost:9090/-/ready' },
+  { name: 'Grafana', icon: '📊', port: '3000', url: 'http://localhost:3000', ping: 'http://localhost:3000/api/health' },
+  { name: 'Loki', icon: '📝', port: '3100', url: null, ping: null },
+];
+
+let statusMap = {};
+let countdown = 30;
+let timer = null;
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function renderServices() {
+  const grid = document.getElementById('services-grid');
+  grid.innerHTML = SERVICES.map(s => `
+    <div class="service-card" id="card-${s.id}">
+      <div class="card-header">
+        <div class="card-info">
+          <div class="service-icon">${s.icon}</div>
+          <div>
+            <div class="service-name">${s.name}</div>
+            <div class="service-tech">${s.tech}</div>
+          </div>
+        </div>
+        <div class="status-badge checking" id="badge-${s.id}">
+          <div class="dot pulse"></div> Checking
+        </div>
+      </div>
+      <div class="card-meta">
+        <span class="meta-tag">:${s.port}</span>
+        <span class="meta-tag" id="latency-${s.id}">—</span>
+      </div>
+      <div class="test-btns">
+        ${s.endpoints.map((ep,i) => `
+          <button class="test-btn${i===0?' primary':''}" onclick="testEndpoint('${s.id}','${ep.url}','${ep.label}',${!!ep.newTab})">
+            ${ep.label}
+          </button>
+        `).join('')}
+      </div>
+      <div class="response-box" id="resp-${s.id}"></div>
+    </div>
+  `).join('');
+}
+
+function renderInfra() {
+  const grid = document.getElementById('infra-grid');
+  grid.innerHTML = INFRA.map((inf, i) => `
+    <div class="infra-card" id="infra-${i}">
+      <div class="infra-avatar">${inf.icon}</div>
+      <div>
+        <div class="infra-name">${inf.url
+          ? `<a href="${inf.url}" target="_blank" style="color:inherit;text-decoration:none">${inf.name} ↗</a>`
+          : inf.name}</div>
+        <div class="infra-port">:${inf.port}</div>
+      </div>
+      <div class="infra-status" id="infra-status-${i}">⏳</div>
+    </div>
+  `).join('');
+}
+
+// ── Health Check ─────────────────────────────────────────────────────────────
+async function checkService(s) {
+  const badge = document.getElementById(`badge-${s.id}`);
+  const latency = document.getElementById(`latency-${s.id}`);
+  badge.className = 'status-badge checking';
+  badge.innerHTML = '<div class="dot pulse"></div> Checking';
+
+  const start = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(s.healthUrl, { signal: ctrl.signal, mode: 'cors' });
+    clearTimeout(timeout);
+    const ms = Date.now() - start;
+    latency.textContent = `${ms}ms`;
+
+    if (res.ok) {
+      badge.className = 'status-badge online';
+      badge.innerHTML = '<div class="dot"></div> Online';
+      statusMap[s.id] = 'online';
+      addLog('success', `${s.name} → ${res.status} OK (${ms}ms)`);
+    } else {
+      badge.className = 'status-badge offline';
+      badge.innerHTML = `<div class="dot"></div> ${res.status}`;
+      statusMap[s.id] = 'offline';
+      addLog('warn', `${s.name} → HTTP ${res.status}`);
+    }
+  } catch (e) {
+    const ms = Date.now() - start;
+    latency.textContent = `${ms}ms`;
+    badge.className = 'status-badge offline';
+    badge.innerHTML = '<div class="dot"></div> Offline';
+    statusMap[s.id] = 'offline';
+    addLog('error', `${s.name} → ${e.name === 'AbortError' ? 'Timeout' : 'Connection refused'}`);
+  }
+  updateCounts();
+}
+
+async function checkInfra(inf, i) {
+  const el = document.getElementById(`infra-status-${i}`);
+  if (!inf.ping) { el.textContent = '❓'; return; }
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(inf.ping, { signal: ctrl.signal, mode: 'cors' });
+    el.textContent = res.ok ? '✅' : '⚠️';
+  } catch { el.textContent = '❌'; }
+}
+
+// ── Test Endpoint ────────────────────────────────────────────────────────────
+async function testEndpoint(serviceId, url, label, newTab) {
+  if (newTab) { window.open(url, '_blank'); return; }
+  const box = document.getElementById(`resp-${serviceId}`);
+  box.textContent = `GET ${url}\n⏳ Fetching...`;
+  box.className = 'response-box visible';
+
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(url, { signal: ctrl.signal, mode: 'cors' });
+    const text = await res.text();
+    let pretty = text;
+    try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+    box.textContent = `GET ${url}\n→ ${res.status} ${res.statusText}\n\n${pretty}`;
+    box.className = `response-box visible ${res.ok ? 'success' : 'error'}`;
+    addLog('info', `Tested ${label} on ${serviceId} → ${res.status}`);
+  } catch (e) {
+    box.textContent = `GET ${url}\n✗ ${e.message}`;
+    box.className = 'response-box visible error';
+    addLog('error', `Failed to call ${label} on ${serviceId}: ${e.message}`);
+  }
+}
+
+// ── Check All ────────────────────────────────────────────────────────────────
+async function checkAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  addLog('info', '── Health check started ──────────────────');
+
+  await Promise.all([
+    ...SERVICES.map(s => checkService(s)),
+    ...INFRA.map((inf, i) => checkInfra(inf, i)),
+  ]);
+
+  const now = new Date().toLocaleTimeString();
+  document.getElementById('last-updated').textContent = `Last checked: ${now}`;
+  btn.classList.remove('spinning');
+  btn.disabled = false;
+  resetCountdown();
+  addLog('info', `── All checks complete at ${now} ─────────`);
+}
+
+// ── Counts ───────────────────────────────────────────────────────────────────
+function updateCounts() {
+  const vals = Object.values(statusMap);
+  document.getElementById('count-online').textContent = vals.filter(v => v === 'online').length;
+  document.getElementById('count-offline').textContent = vals.filter(v => v === 'offline').length;
+}
+
+// ── Log ──────────────────────────────────────────────────────────────────────
+function addLog(type, msg) {
+  const box = document.getElementById('log-box');
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = `log-entry ${type}`;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="msg">${msg}</span>`;
+  box.prepend(div);
+  if (box.children.length > 80) box.removeChild(box.lastChild);
+}
+
+// ── Countdown ────────────────────────────────────────────────────────────────
+function resetCountdown() {
+  countdown = 30;
+  clearInterval(timer);
+  timer = setInterval(() => {
+    countdown--;
+    document.getElementById('countdown').textContent = countdown + 's';
+    if (countdown <= 0) checkAll();
+  }, 1000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+renderServices();
+renderInfra();
+addLog('info', 'Dashboard initialized. Running first health check...');
+checkAll();
+</script>
+</body>
+</html>

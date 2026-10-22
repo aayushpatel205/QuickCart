@@ -29,13 +29,11 @@ public class OrderServiceClient : IOrderServiceClient
         var payload = new
         {
             userId,
+            restaurantId = items.First().RestaurantId,
             address,
             items = items.Select(i => new
             {
                 itemId = i.ItemId,
-                restaurantId = i.RestaurantId,
-                name = i.Name,
-                price = i.Price,
                 qty = i.Qty
             })
         };

@@ -12,6 +12,7 @@ services:
       - name: restaurant-route
         paths:
           - /api/restaurants
+        strip_path: true
   - name: payment-service
     url: http://payment-service:8083
     routes:
