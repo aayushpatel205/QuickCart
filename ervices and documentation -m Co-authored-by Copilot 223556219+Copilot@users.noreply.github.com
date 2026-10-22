@@ -1,0 +1,13 @@
+ README.md                                        | 411 [32m++++++++++++++++[m
+ cart-notification/Dockerfile                     |  11 [32m+[m[31m-[m
+ cart-notification/Services/OrderServiceClient.cs |   4 [32m+[m[31m-[m
+ docker-compose-hub.yml                           | 368 [32m+++++++++++++++[m
+ docker-compose.yml                               | 434 [32m+++++++++++++++[m[31m--[m
+ frontend/Dockerfile                              |   4 [32m+[m
+ frontend/index.html                              |  61 [32m+++[m
+ frontend/nginx.conf                              |  43 [32m++[m
+ infra/kong/kong.yaml                             |   1 [32m+[m
+ payment-patch/Dockerfile                         |  13 [32m+[m
+ quickcart-dashboard.html                         | 574 [32m+++++++++++++++++++++++[m
+ test_flow.sh                                     |   2 [32m+[m[31m-[m
+ 12 files changed, 1876 insertions(+), 50 deletions(-)
