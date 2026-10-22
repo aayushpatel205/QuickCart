@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # -------------------------------------------------------------------------
+  # MongoDB for Restaurant Service (Document DB: restaurantdb)
+  # -------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: quickcart-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: restaurantdb
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - quickcart-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # Restaurant Microservice (Node.js + Express + gRPC)
+  # -------------------------------------------------------------------------
+  restaurant-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quickcart-restaurant-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"    # REST API & Prometheus /metrics
+      - "50051:50051"  # gRPC MenuService
+    environment:
+      NODE_ENV: development
+      PORT: 8082
+      GRPC_PORT: 50051
+      MONGODB_URI: mongodb://mongodb:27017/restaurantdb
+      JWT_SECRET: quickcart-super-secret-jwt-key-2026
+      LOG_LEVEL: info
+      CB_TIMEOUT_MS: 3000
+      CB_ERROR_THRESHOLD: 50
+      CB_RESET_TIMEOUT_MS: 5000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - quickcart-net
+
+  # -------------------------------------------------------------------------
+  # Kong API Gateway (DB-less Declarative Mode)
+  # -------------------------------------------------------------------------
+  kong-gateway:
+    image: kong:3.6-alpine
+    container_name: quickcart-kong-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # Kong HTTP Proxy
+      - "8443:8443" # Kong HTTPS Proxy
+      - "8001:8001" # Kong Admin API / Metrics
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: "/etc/kong/kong.yml"
+      KONG_PROXY_LISTEN: "0.0.0.0:8080, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PROXY_ACCESS_LOG: "/dev/stdout"
+      KONG_ADMIN_ACCESS_LOG: "/dev/stdout"
+      KONG_PROXY_ERROR_LOG: "/dev/stderr"
+      KONG_ADMIN_ERROR_LOG: "/dev/stderr"
+    volumes:
+      - ./gateway/kong-docker.yml:/etc/kong/kong.yml:ro
+    depends_on:
+      - restaurant-service
+    networks:
+      - quickcart-net
+
+volumes:
+  mongo_data:
+
+networks:
+  quickcart-net:
+    driver: bridge

@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restaurant-service
+  namespace: quickcart
+  labels:
+    app.kubernetes.io/name: restaurant-service
+    app.kubernetes.io/part-of: quickcart
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: restaurant-service
+  template:
+    metadata:
+      labels:
+        app: restaurant-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8082"
+        prometheus.io/path: "/metrics"
+    spec:
+      volumes:
+        - name: shared-logs
+          emptyDir: {}
+
+      containers:
+        # ==========================================
+        # Primary Application Container
+        # ==========================================
+        - name: restaurant-service
+          image: tirthchaklasiya19/restaurant-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8082
+              protocol: TCP
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: restaurant-service-config
+            - secretRef:
+                name: restaurant-service-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+          volumeMounts:
+            - name: shared-logs
+              mountPath: /var/log/quickcart
+
+        # ==========================================
+        # Sidecar Container: Log/Metrics Monitoring
+        # ==========================================
+        - name: metrics-log-sidecar
+          image: busybox:1.36
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              echo "[Sidecar] Initializing QuickCart log & health sidecar observer..."
+              while true; do
+                # Sidecar periodically polls health & metrics endpoint on localhost loopback
+                STATUS=$(wget -q -O - http://127.0.0.1:8082/health 2>/dev/null || echo '{"status":"DOWN"}')
+                echo "[Sidecar $(date -u +%FT%TZ)] Local health observation: $STATUS"
+                sleep 30
+              done
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+          volumeMounts:
+            - name: shared-logs
+              mountPath: /var/log/quickcart

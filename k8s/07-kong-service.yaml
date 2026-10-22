@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-gateway
+  namespace: quickcart
+  labels:
+    app.kubernetes.io/name: kong-gateway
+    app.kubernetes.io/part-of: quickcart
+spec:
+  type: LoadBalancer # Or NodePort in local Minikube / Kind clusters
+  selector:
+    app: kong-gateway
+  ports:
+    - name: proxy
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: proxy-ssl
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+    - name: metrics
+      port: 8100
+      targetPort: 8100
+      protocol: TCP

@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-declarative-config
+  namespace: quickcart
+  labels:
+    app.kubernetes.io/name: kong-gateway
+    app.kubernetes.io/part-of: quickcart
+data:
+  kong.yml: |
+    _format_version: "3.0"
+
+    services:
+      - name: restaurant-service
+        url: http://restaurant-service.quickcart.svc.cluster.local:8082
+        routes:
+          - name: restaurant-route
+            paths:
+              - /restaurants
+            strip_path: false
+
+      - name: order-service
+        url: http://order-service.quickcart.svc.cluster.local:8081
+        routes:
+          - name: order-route
+            paths:
+              - /orders
+            strip_path: false
+
+      - name: payment-service
+        url: http://payment-service.quickcart.svc.cluster.local:8083
+        routes:
+          - name: payment-route
+            paths:
+              - /payments
+            strip_path: false
+
+      - name: delivery-service
+        url: http://delivery-service.quickcart.svc.cluster.local:8084
+        routes:
+          - name: delivery-route
+            paths:
+              - /deliveries
+            strip_path: false
+
+      - name: cart-notification-service
+        url: http://cart-notification.quickcart.svc.cluster.local:8085
+        routes:
+          - name: cart-route
+            paths:
+              - /cart
+            strip_path: false
+          - name: notification-route
+            paths:
+              - /notifications
+            strip_path: false
+
+    consumers:
+      - username: quickcart-app-consumer
+        custom_id: quickcart-client-apps
+        jwt_secrets:
+          - key: quickcart-auth
+            secret: quickcart-super-secret-jwt-key-2026
+            algorithm: HS256
+
+    plugins:
+      - name: correlation-id
+        config:
+          header_name: X-Correlation-Id
+          generator: uuid
+          echo_downstream: true
+
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+
+      - name: prometheus
+        config:
+          per_consumer: true
+
+      - name: jwt
+        config:
+          key_claim_name: iss
+          secret_is_base64: false
+
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - "X-Gateway-Name:QuickCart-Kong"

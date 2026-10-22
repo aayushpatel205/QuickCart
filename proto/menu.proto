@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package quickcart;
+
+service MenuService {
+  rpc ValidateItems(ValidateRequest) returns (ValidateResponse);
+}
+
+message Item {
+  string itemId = 1;
+  int32 qty = 2;
+}
+
+message ValidateRequest {
+  string restaurantId = 1;
+  repeated Item items = 2;
+}
+
+message ValidateResponse {
+  bool valid = 1;
+  double totalPrice = 2;
+  string message = 3;
+}

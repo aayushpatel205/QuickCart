@@ -1,0 +1,143 @@
+_format_version: "3.0"
+
+# QuickCart Microservices Declarative API Gateway Configuration (DB-less Kong)
+
+services:
+  # 1. Restaurant Service (Node.js + Express)
+  - name: restaurant-service
+    url: http://restaurant-service.quickcart.svc.cluster.local:8082
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: restaurant-route
+        paths:
+          - /restaurants
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+
+  # 2. Order Service (Java 17 + Spring Boot)
+  - name: order-service
+    url: http://order-service.quickcart.svc.cluster.local:8081
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: order-route
+        paths:
+          - /orders
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+
+  # 3. Payment Service (Python + FastAPI)
+  - name: payment-service
+    url: http://payment-service.quickcart.svc.cluster.local:8083
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: payment-route
+        paths:
+          - /payments
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+
+  # 4. Delivery Service (Go + Gin)
+  - name: delivery-service
+    url: http://delivery-service.quickcart.svc.cluster.local:8084
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: delivery-route
+        paths:
+          - /deliveries
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+
+  # 5. Cart & Notification Service (C# .NET 8 Web API)
+  - name: cart-notification-service
+    url: http://cart-notification.quickcart.svc.cluster.local:8085
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: cart-route
+        paths:
+          - /cart
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+      - name: notification-route
+        paths:
+          - /notifications
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+
+# Consumers and Credentials for JWT Authentication
+consumers:
+  - username: quickcart-app-consumer
+    custom_id: quickcart-client-apps
+    jwt_secrets:
+      - key: quickcart-auth
+        secret: quickcart-super-secret-jwt-key-2026
+        algorithm: HS256
+
+# Global Gateway Plugins
+plugins:
+  # 1. Distributed Correlation ID for End-to-End Tracing
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-Id
+      generator: uuid
+      echo_downstream: true
+
+  # 2. Rate Limiting (60 requests per minute per IP)
+  - name: rate-limiting
+    config:
+      minute: 60
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+
+  # 3. Prometheus Observability Metric Exporter
+  - name: prometheus
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+
+  # 4. JWT Authentication Plugin
+  - name: jwt
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: true
+
+  # 5. Request Transformer to forward identity headers to backend microservices
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - "X-Gateway-Name:QuickCart-Kong"
