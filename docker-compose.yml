@@ -1,0 +1,37 @@
+services:
+  delivery-db:
+    image: postgres:15-alpine
+    container_name: delivery-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: deliverydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d deliverydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  delivery-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: delivery-service
+    ports:
+      - "8084:8084"
+    environment:
+      PORT: "8084"
+      SERVICE_NAME: "delivery-service"
+      DATABASE_URL: "postgres://postgres:postgres@delivery-db:5432/deliverydb?sslmode=disable"
+      KAFKA_BROKERS: "kafka:9092"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    depends_on:
+      delivery-db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
