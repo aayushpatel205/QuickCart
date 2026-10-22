@@ -1,0 +1,64 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/orderdb}
+    username: ${DB_USER:orderuser}
+    password: ${DB_PASSWORD:orderpass}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+grpc:
+  restaurant:
+    host: ${RESTAURANT_GRPC_HOST:localhost}
+    port: ${RESTAURANT_GRPC_PORT:50051}
+
+quickcart:
+  rabbit:
+    exchange: ${RABBITMQ_NOTIFICATION_EXCHANGE:quickcart.notifications}
+    queue: ${RABBITMQ_NOTIFICATION_QUEUE:notification.queue}
+    dlq: ${RABBITMQ_NOTIFICATION_DLQ:notification.dlq}
+    routing-key: ${RABBITMQ_NOTIFICATION_ROUTING_KEY:notification}
+
+resilience4j:
+  retry:
+    instances:
+      restaurantGrpc:
+        max-attempts: 3
+        wait-duration: 300ms
+  circuitbreaker:
+    instances:
+      restaurantGrpc:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
